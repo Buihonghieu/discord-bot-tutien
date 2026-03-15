@@ -1,0 +1,59 @@
+{
+    "467401731303669760": {
+        "name": "Tiểu MỸ Chi",
+        "tuvi": 44,
+        "linhthach": 16000000,
+        "vang": 10000000,
+        "exp_ngay": 44,
+        "last_reset_day": "2026-03-15",
+        "last_action": 1773567425.6946387,
+        "trangbi": {},
+        "durability": {},
+        "gold": 599,
+        "last_diemdanh": "2026-03-15"
+    },
+    "687285407431393415": {
+        "name": "Azir",
+        "tuvi": 0,
+        "gold": 1761,
+        "linhthach": 15,
+        "trangbi": {
+            "mu": "Cấp 1",
+            "giap": "Cấp 1",
+            "gang": "Cấp 1",
+            "giay": "Cấp 1",
+            "vukhi": "Cấp 1"
+        },
+        "tui_do": {},
+        "pet": "🐱 Linh Miêu (Thường)",
+        "last_tuluyen": 0,
+        "last_diemdanh": "2026-03-15"
+    },
+    "343551331610394654": {
+        "name": "Momo ꒰ᐢ⸝⸝•༝•⸝⸝ᐢ꒱",
+        "tuvi": 108,
+        "gold": 2096,
+        "linhthach": 5,
+        "trangbi": {
+            "mu": "Cấp 1",
+            "giap": "Cấp 1",
+            "gang": "Cấp 1",
+            "giay": "Cấp 1",
+            "vukhi": "Cấp 1"
+        },
+        "tui_do": {},
+        "pet": "🐱 Linh Miêu (Thường)",
+        "last_tuluyen": 0,
+        "last_diemdanh": "2026-03-15",
+        "last_haiduoc": 1773577879,
+        "last_action": 1773574604.447215,
+        "durability": {
+            "mu": 100,
+            "giap": 85,
+            "gang": 71,
+            "giay": 100,
+            "vukhi": 82
+        },
+        "exp_ngay": 108
+    }
+}
