@@ -20,9 +20,14 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-print("Đã load .env")
-print("DISCORD_TOKEN =", os.getenv("DISCORD_TOKEN"))
+
 TOKEN = os.getenv("DISCORD_TOKEN")
+DATA_DIR = os.getenv("DATA_DIR", "/data")
+
+print("Đã load environment")
+print("TOKEN tồn tại:", bool(TOKEN))
+print("DATA_DIR =", DATA_DIR)
+
 if not TOKEN:
     raise RuntimeError("Thiếu DISCORD_TOKEN")
 
