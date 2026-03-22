@@ -3,7 +3,7 @@ import os
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import random
 import time
@@ -65,6 +65,17 @@ ADMIN_IDS = {467401731303669760}
 admin_ids_raw = os.getenv("ADMIN_IDS", "")
 if admin_ids_raw:
     ADMIN_IDS.update({int(x.strip()) for x in admin_ids_raw.split(",") if x.strip()})
+
+async def reply_msg(interaction: discord.Interaction, content=None, embed=None, ephemeral=False):
+    try:
+        if interaction.response.is_done():
+            return await interaction.followup.send(content=content, embed=embed, ephemeral=ephemeral)
+        return await interaction.response.send_message(content=content, embed=embed, ephemeral=ephemeral)
+    except Exception:
+        try:
+            return await interaction.followup.send(content=content, embed=embed, ephemeral=ephemeral)
+        except Exception:
+            return None
 
 # --- 1.2 Database Tĩnh ---
 
@@ -242,11 +253,11 @@ async def equipment_autocomplete(
 
 # --- 1.6 Admin Command ---
 
-@bot.tree.command(name="set_tuvi", description="[Đại Năng] Chỉnh sửa tu vi của một người chơi")
+@bot.tree.command(name="set_tuvi", description="[Thiên Đạo] Chỉnh sửa tu vi của một người chơi")
 @app_commands.describe(user="Tu sĩ cần chỉnh", amount="Lượng tu vi mới")
 async def set_tuvi(interaction: discord.Interaction, user: discord.Member, amount: int):
     if not is_admin(interaction.user.id):
-        return await interaction.response.send_message("❌ Ngươi không phải Đại Năng, không thể can thiệp nhân quả!", ephemeral=True)
+        return await interaction.response.send_message("❌ Ngươi không phải Thiên Đạo, không thể can thiệp nhân quả!", ephemeral=True)
     
     uid = str(user.id)
     data = load_data()
@@ -258,9 +269,9 @@ async def set_tuvi(interaction: discord.Interaction, user: discord.Member, amoun
     data[uid]["tuvi"] = max(0, amount)
     save_data(data)
     
-    await interaction.response.send_message(f"✨ **Đại Năng** đã thay đổi tu vi của **{user.display_name}**: `{old_tuvi}` -> `{amount}`")
+    await interaction.response.send_message(f"✨ **Thiên Đạo** đã thay đổi tu vi của **{user.display_name}**: `{old_tuvi}` -> `{amount}`")
 
-@bot.tree.command(name="reset_tuvi", description="[Đại Năng] Đưa tu vi của một người về 0 (Vẫn giữ trang bị)")
+@bot.tree.command(name="reset_tuvi", description="[Thiên Đạo] Đưa tu vi của một người về 0 (Vẫn giữ trang bị)")
 async def reset_tuvi(interaction: discord.Interaction, user: discord.Member):
     if not is_admin(interaction.user.id):
         return await interaction.response.send_message("❌ Ngươi không đủ pháp lực để thực hiện việc này!", ephemeral=True)
@@ -271,14 +282,14 @@ async def reset_tuvi(interaction: discord.Interaction, user: discord.Member):
     if uid in data:
         data[uid]["tuvi"] = 0
         save_data(data)
-        await interaction.response.send_message(f"♻️ **Đại Năng** đã tẩy tủy cho **{user.display_name}**. Tu vi đã về 0, nhưng trang bị và vật phẩm vẫn giữ nguyên.")
+        await interaction.response.send_message(f"♻️ **Thiên Đạo** đã tẩy tủy cho **{user.display_name}**. Tu vi đã về 0, nhưng trang bị và vật phẩm vẫn giữ nguyên.")
     else:
         await interaction.response.send_message("❌ Tu sĩ này chưa nhập đạo.")
 
-@bot.tree.command(name="reset_player", description="[Đại Năng] Xóa bỏ căn cơ, ép tu sĩ nhập đạo lại (Xóa sạch hết)")
+@bot.tree.command(name="reset_player", description="[Thiên Đạo] Xóa bỏ căn cơ, ép tu sĩ nhập đạo lại (Xóa sạch hết)")
 async def reset_player(interaction: discord.Interaction, user: discord.Member):
     if not is_admin(interaction.user.id):
-        return await interaction.response.send_message("❌ Chỉ có Đại Năng mới có quyền xóa sổ đạo hạnh của người khác!", ephemeral=True)
+        return await interaction.response.send_message("❌ Chỉ có Thiên Đạo mới có quyền xóa sổ đạo hạnh của người khác!", ephemeral=True)
     
     uid = str(user.id)
     data = load_data()
@@ -286,14 +297,14 @@ async def reset_player(interaction: discord.Interaction, user: discord.Member):
     if uid in data:
         del data[uid]
         save_data(data)
-        await interaction.response.send_message(f"🧹 **Đại Năng** đã xóa sạch căn cơ của **{user.display_name}**. Người này giờ đã trở lại làm phàm nhân.")
+        await interaction.response.send_message(f"🧹 **Thiên Đạo** đã xóa sạch căn cơ của **{user.display_name}**. Người này giờ đã trở lại làm phàm nhân.")
     else:
         await interaction.response.send_message("❌ Người này vốn đã là phàm nhân.")
 
-@bot.tree.command(name="add_linhthach", description="[Đại Năng] Ban phát hoặc thu hồi linh thạch")
+@bot.tree.command(name="add_linhthach", description="[Thiên Đạo] Ban phát hoặc thu hồi linh thạch")
 async def add_linhthach(interaction: discord.Interaction, user: discord.Member, amount: int):
     if not is_admin(interaction.user.id):
-        return await interaction.response.send_message("❌ Càn khôn túi của Đại Năng không phải ai cũng mở được!", ephemeral=True)
+        return await interaction.response.send_message("❌ Càn khôn túi của Thiên Đạo không phải ai cũng mở được!", ephemeral=True)
     
     uid = str(user.id)
     data = load_data()
@@ -305,14 +316,14 @@ async def add_linhthach(interaction: discord.Interaction, user: discord.Member, 
     save_data(data)
     
     action = "ban tặng" if amount >= 0 else "thu hồi"
-    await interaction.response.send_message(f"💎 **Đại Năng** đã {action} `{abs(amount)}` Linh Thạch cho **{user.display_name}**. Hiện có: `{data[uid]['linhthach']}`")
+    await interaction.response.send_message(f"💎 **Thiên Đạo** đã {action} `{abs(amount)}` Linh Thạch cho **{user.display_name}**. Hiện có: `{data[uid]['linhthach']}`")
 
-@bot.tree.command(name="add_vang", description="[Đại Năng] Ban tặng Vàng cho tu sĩ")
+@bot.tree.command(name="add_vang", description="[Thiên Đạo] Ban tặng Vàng cho tu sĩ")
 @app_commands.describe(user="Người được ban tặng", amount="Số lượng vàng")
 async def add_vang(interaction: discord.Interaction, user: discord.Member, amount: int):
     # 1. Kiểm tra quyền Admin (Chỉ những ID trong ADMIN_IDS mới được dùng)
     if not is_admin(interaction.user.id):
-        return await interaction.response.send_message("❌ Càn khôn túi của Đại Năng không phải ai cũng mở được!", ephemeral=True)
+        return await interaction.response.send_message("❌ Càn khôn túi của Thiên Đạo không phải ai cũng mở được!", ephemeral=True)
     
     if amount <= 0:
         return await interaction.response.send_message("❌ Số lượng vàng phải lớn hơn 0!", ephemeral=True)
@@ -331,21 +342,21 @@ async def add_vang(interaction: discord.Interaction, user: discord.Member, amoun
     
     # 3. Phản hồi bằng Embed cho trang trọng
     embed = discord.Embed(
-        title="✨ ĐẠI NĂNG BAN LỘC",
-        description=f"**Đại Năng** đã ban tặng 🪙 `{amount:,}` Vàng cho **{user.display_name}**!",
+        title="✨ Thiên Đạo BAN LỘC",
+        description=f"**Thiên Đạo** đã ban tặng 🪙 `{amount:,}` Vàng cho **{user.display_name}**!",
         color=0xffd700 # Màu vàng kim
     )
     embed.add_field(name="💰 Túi đồ hiện tại", value=f"🪙 `{data[uid]['gold']:,}` Vàng", inline=False)
     embed.set_thumbnail(url=user.display_avatar.url)
-    embed.set_footer(text="Đa tạ Đại Năng đã chiếu cố!")
+    embed.set_footer(text="Đa tạ Thiên Đạo đã chiếu cố!")
 
-    await interaction.response.send_message(embed=embed)
+    await reply_msg(interaction, embed=embed)
 
-@bot.tree.command(name="add_pet", description="[Đại Năng] Ban phát linh thú từ linh giới")
+@bot.tree.command(name="add_pet", description="[Thiên Đạo] Ban phát linh thú từ linh giới")
 @app_commands.autocomplete(pet_name=pet_autocomplete) # Kết nối gợi ý vào tham số pet_name
 async def add_pet(interaction: discord.Interaction, user: discord.Member, pet_name: str):
     if not is_admin(interaction.user.id):
-        return await interaction.response.send_message("❌ Càn khôn túi của Đại Năng không phải ai cũng mở được!", ephemeral=True)
+        return await interaction.response.send_message("❌ Càn khôn túi của Thiên Đạo không phải ai cũng mở được!", ephemeral=True)
     
     uid = str(user.id)
     data = load_data()
@@ -357,23 +368,23 @@ async def add_pet(interaction: discord.Interaction, user: discord.Member, pet_na
     if pet_name.lower() == "none":
         data[uid]["pet"] = "None"
         save_data(data)
-        return await interaction.response.send_message(f"🌬️ **Đại Năng** đã thu hồi linh thú của **{user.display_name}**.")
+        return await interaction.response.send_message(f"🌬️ **Thiên Đạo** đã thu hồi linh thú của **{user.display_name}**.")
 
     # Kiểm tra và ban tặng
     if pet_name in PET_DATA:
         pet_info = PET_DATA[pet_name]
         display_name = f"{pet_info['icon']} {pet_name} ({pet_info['rarity']})"
         data[uid]["pet"] = display_name
-        msg = f"🐾 **Đại Năng** đã triệu hồi **{display_name}** ban cho **{user.display_name}**!"
+        msg = f"🐾 **Thiên Đạo** đã triệu hồi **{display_name}** ban cho **{user.display_name}**!"
     else:
         # Trường hợp đạo hữu tự nhập tên pet lạ không có trong danh sách
         data[uid]["pet"] = pet_name 
-        msg = f"🐾 **Đại Năng** đã ban tặng Linh thú tự chế **[{pet_name}]** cho **{user.display_name}**!"
+        msg = f"🐾 **Thiên Đạo** đã ban tặng Linh thú tự chế **[{pet_name}]** cho **{user.display_name}**!"
 
     save_data(data)
     await interaction.response.send_message(msg)
 
-@bot.tree.command(name="add_trangbi", description="[Đại Năng] Ban phát pháp bảo từ thượng giới")
+@bot.tree.command(name="add_trangbi", description="[Thiên Đạo] Ban phát pháp bảo từ thượng giới")
 @app_commands.describe(loai="Chọn loại trang bị", item_name="Chọn tên vật phẩm")
 @app_commands.choices(loai=[
     app_commands.Choice(name="Mũ (Nón)", value="mu"),
@@ -416,7 +427,7 @@ async def add_trangbi(interaction: discord.Interaction, user: discord.Member, lo
 
         save_data(data)
         
-        msg = f"✨ **Đại Năng** đã ban tặng **{item_name}** ({found_level}) cho **{user.display_name}**!"
+        msg = f"✨ **Thiên Đạo** đã ban tặng **{item_name}** ({found_level}) cho **{user.display_name}**!"
         await interaction.response.send_message(msg)
     else:
         await interaction.response.send_message(f"❌ Vật phẩm `{item_name}` không tồn tại trong loại `{loai}`!", ephemeral=True)
@@ -437,7 +448,7 @@ def check_cooldown(user, cooldown_seconds):
 
 def get_today_str():
     # Railway thường chạy UTC, cộng 7 giờ để đúng mốc 00:00 giờ Việt Nam
-    vn_now = datetime.utcnow() + timedelta(hours=7)
+    vn_now = datetime.now(timezone.utc) + timedelta(hours=7)
     return vn_now.strftime("%Y-%m-%d")
 
 def check_daily_reset(user):
@@ -450,6 +461,38 @@ def check_daily_reset(user):
         user["last_reset_day"] = today
         return True
     return False
+
+
+def get_remaining_cooldown(user, action_name: str, now: int) -> int:
+    """
+    Tương thích data cũ:
+    - tutien / tuluyen trước đây dùng last_action
+    - haiduoc dùng last_haiduoc
+    Data mới sẽ ưu tiên từng key riêng.
+    """
+    action_key_map = {
+        "tutien": ["last_tutien", "last_action"],
+        "tuluyen": ["last_tuluyen", "last_action"],
+        "haiduoc": ["last_haiduoc"],
+    }
+    keys = action_key_map.get(action_name, [])
+    latest_until = 0
+    for key in keys:
+        latest_until = max(latest_until, int(user.get(key, 0) or 0))
+    return max(0, latest_until - now)
+
+
+def set_action_cooldown(user, action_name: str, cooldown_seconds: int, now: int):
+    until = now + cooldown_seconds
+    if action_name == "tutien":
+        user["last_tutien"] = until
+        # giữ last_action để tương thích code cũ / data cũ
+        user["last_action"] = until
+    elif action_name == "tuluyen":
+        user["last_tuluyen"] = until
+        user["last_action"] = until
+    elif action_name == "haiduoc":
+        user["last_haiduoc"] = until
 
 # --- 2.2 Hàm xác định Cảnh giới hiện tại ---
 def get_rank_index(tuvi):
@@ -475,7 +518,7 @@ async def tutien(interaction: discord.Interaction):
     data = load_data()
 
     if uid not in data:
-        return await interaction.response.send_message("❌ Ngươi chưa nhập đạo!", ephemeral=True)
+        return await reply_msg(interaction, "❌ Ngươi chưa nhập đạo!", ephemeral=True)
 
     user = data[uid]
     now = int(time.time())
@@ -488,19 +531,20 @@ async def tutien(interaction: discord.Interaction):
     injury_until = user.get("injury_until", 0)
     if now < injury_until:
         rem_injury = int((injury_until - now) / 60)
-        return await interaction.response.send_message(
+        return await reply_msg(
+            interaction,
             f"❌ Đạo hữu đang bị **trọng thương** sau trận chiến Boss, không thể **Tu Tiên**! Cần nghỉ ngơi thêm **{rem_injury} phút**.",
             ephemeral=True
         )
 
-    # Kiểm tra Cooldown Tịnh tâm (3 phút - Admin được miễn)
-    last_action = int(user.get("last_action", 0))
-    if now < last_action and not is_admin(interaction.user.id):
-        rem = int(last_action - now)
+    # Kiểm tra Cooldown Tịnh tâm (3 phút - tương thích data cũ)
+    rem = get_remaining_cooldown(user, "tutien", now)
+    if rem > 0 and not is_admin(interaction.user.id):
         phut = rem // 60
         giay = rem % 60
         time_str = f"{phut}ph {giay}s" if phut > 0 else f"{giay}s"
-        return await interaction.response.send_message(
+        return await reply_msg(
+            interaction,
             f"⏳ Đạo hữu đang tịnh tâm, hãy quay lại sau **{time_str}**.",
             ephemeral=True
         )
@@ -508,7 +552,8 @@ async def tutien(interaction: discord.Interaction):
     exp_ngay = user.get("exp_ngay", 0)
     max_exp_ngay = 3000
     if exp_ngay >= max_exp_ngay:
-        return await interaction.response.send_message(
+        return await reply_msg(
+            interaction,
             "❌ Linh khí hôm nay đã đạt `3000/3000`, không thể `/tutien` hay `/tuluyen` thêm nữa.\n"
             "Hãy chờ qua **12h đêm** để hệ thống reset linh khí ngày.",
             ephemeral=True
@@ -517,7 +562,7 @@ async def tutien(interaction: discord.Interaction):
     idx = get_rank_index(user["tuvi"])
     current_rank = RANKS[idx]
     if user["tuvi"] >= current_rank["max"] - 1:
-        return await interaction.response.send_message(f"⚡ Đỉnh phong rồi. Hãy `/dotpha`!", ephemeral=True)
+        return await reply_msg(interaction, f"⚡ Đỉnh phong rồi. Hãy `/dotpha`!", ephemeral=True)
 
     base_exp = random.randint(10, 35)
     gold_receive = random.randint(50, 150)
@@ -541,7 +586,7 @@ async def tutien(interaction: discord.Interaction):
     user["tuvi"] = min(user["tuvi"] + final_exp, current_rank["max"] - 1)
     user["exp_ngay"] = exp_ngay + final_exp
     user["gold"] = user.get("gold", 0) + gold_receive
-    user["last_action"] = now + 180
+    set_action_cooldown(user, "tutien", 180, now)
 
     save_data(data)
 
@@ -566,7 +611,7 @@ async def tutien(interaction: discord.Interaction):
     embed.set_footer(text=footer_text)
     embed.set_thumbnail(url=interaction.user.display_avatar.url)
 
-    await interaction.response.send_message(embed=embed)
+    await reply_msg(interaction, embed=embed)
 
 @bot.tree.command(name="tuluyen", description="Ra ngoài diệt quái (Delay 5 phút - Chung với Tutien)")
 async def tuluyen(interaction: discord.Interaction):
@@ -574,7 +619,7 @@ async def tuluyen(interaction: discord.Interaction):
     data = load_data()
 
     if uid not in data:
-        return await interaction.response.send_message("❌ Ngươi chưa nhập đạo!", ephemeral=True)
+        return await reply_msg(interaction, "❌ Ngươi chưa nhập đạo!", ephemeral=True)
 
     user = data[uid]
     now = int(time.time())
@@ -586,18 +631,19 @@ async def tuluyen(interaction: discord.Interaction):
     injury_until = user.get("injury_until", 0)
     if now < injury_until:
         rem_injury = int((injury_until - now) / 60)
-        return await interaction.response.send_message(
+        return await reply_msg(
+            interaction,
             f"❌ Kinh mạch đang rối loạn do **trọng thương**, không thể **Tu Luyện**! Hãy đợi **{rem_injury} phút** nữa.",
             ephemeral=True
         )
 
-    last_action = int(user.get("last_action", 0))
-    if now < last_action and not is_admin(interaction.user.id):
-        rem = int(last_action - now)
+    rem = get_remaining_cooldown(user, "tuluyen", now)
+    if rem > 0 and not is_admin(interaction.user.id):
         phut = rem // 60
         giay = rem % 60
         time_str = f"{phut}ph {giay}s" if phut > 0 else f"{giay}s"
-        return await interaction.response.send_message(
+        return await reply_msg(
+            interaction,
             f"⚔️ Đạo hữu vừa đại chiến xong, thể lực chưa hồi phục! Hãy nghỉ ngơi thêm **{time_str}**.",
             ephemeral=True
         )
@@ -607,7 +653,8 @@ async def tuluyen(interaction: discord.Interaction):
     exp_ngay = user.get("exp_ngay", 0)
     max_exp_ngay = 3000
     if exp_ngay >= max_exp_ngay:
-        return await interaction.response.send_message(
+        return await reply_msg(
+            interaction,
             "❌ Linh khí hôm nay đã đạt `3000/3000`, không thể `/tutien` hay `/tuluyen` thêm nữa.\n"
             "Hãy chờ qua **12h đêm** để hệ thống reset linh khí ngày.",
             ephemeral=True
@@ -618,7 +665,7 @@ async def tuluyen(interaction: discord.Interaction):
 
     dur_vukhi = user["durability"].get("vukhi", 100)
     if dur_vukhi <= 0:
-        return await interaction.response.send_message("❌ Vũ khí nát vụn rồi, hãy `/suado` ngay!", ephemeral=True)
+        return await reply_msg(interaction, "❌ Vũ khí nát vụn rồi, hãy `/suado` ngay!", ephemeral=True)
 
     base_win_rate = 0.70
     penalty = (100 - dur_vukhi) / 200 if dur_vukhi < 100 else 0
@@ -685,10 +732,10 @@ async def tuluyen(interaction: discord.Interaction):
             user["durability"][slot] = max(0, user["durability"][slot] - loss)
             embed.description += f"\n• {slot_icons[slot]} {slot.upper()}: `-{loss}%` (Còn {user['durability'][slot]}%)"
 
-    user["last_action"] = now + 300
+    set_action_cooldown(user, "tuluyen", 300, now)
     save_data(data)
 
-    await interaction.response.send_message(embed=embed)
+    await reply_msg(interaction, embed=embed)
 
 @bot.tree.command(name="haiduoc", description="Cùng Linh thú vào rừng hái dược (1 tiếng/lần - Nhận 5-20 Linh Thạch)")
 async def haiduoc(interaction: discord.Interaction):
@@ -696,18 +743,17 @@ async def haiduoc(interaction: discord.Interaction):
     data = load_data()
     
     if uid not in data:
-        return await interaction.response.send_message("❌ Ngươi chưa nhập đạo!", ephemeral=True)
+        return await reply_msg(interaction, "❌ Ngươi chưa nhập đạo!", ephemeral=True)
     
     user = data[uid]
     now = int(time.time())
 
     # --- 1. KIỂM TRA COOLDOWN (1 TIẾNG) ---
-    last_haiduoc = user.get("last_haiduoc", 0) 
-    if now < last_haiduoc and not is_admin(interaction.user.id):
-        rem = last_haiduoc - now
+    rem = get_remaining_cooldown(user, "haiduoc", now)
+    if rem > 0 and not is_admin(interaction.user.id):
         phut = rem // 60
         giay = rem % 60
-        return await interaction.response.send_message(f"⏳ Thể lực cạn kiệt, hãy quay lại sau **{phut}ph {giay}s**.", ephemeral=True)
+        return await reply_msg(interaction, f"⏳ Thể lực cạn kiệt, hãy quay lại sau **{phut}ph {giay}s**.", ephemeral=True)
 
     # --- 2. LOGIC HÁI DƯỢC (5-20 LINH THẠCH) ---
     base_lt = random.randint(5, 20) # Giới hạn 5-20 theo lệnh của Tông chủ
@@ -746,7 +792,7 @@ async def haiduoc(interaction: discord.Interaction):
     embed.set_footer(text="⏳ Cần nghỉ ngơi 1 tiếng để hồi phục thể lực")
     embed.set_thumbnail(url=interaction.user.display_avatar.url)
     
-    await interaction.response.send_message(embed=embed)
+    await reply_msg(interaction, embed=embed)
     
 # --- 3.3 Lệnh Đột phá (Chính thức thăng cấp - Bản nâng cấp độ khó) ---
 @bot.tree.command(name="dotpha", description="Vượt qua bình cảnh để thăng cấp cảnh giới")
@@ -815,7 +861,7 @@ async def dotpha(interaction: discord.Interaction):
         embed.set_footer(text=f"Tỷ lệ thành công: {success_rate}% - Hãy kiên trì tu luyện lại!")
     
     save_data(data)
-    await interaction.response.send_message(embed=embed)
+    await reply_msg(interaction, embed=embed)
 
 #4: Hệ thống Nhập Đạo & Thông Tin Nhân Vật
 
@@ -848,8 +894,10 @@ async def nhapdao(interaction: discord.Interaction):
         },
         "tui_do": {},
         "pet": None,
+        "last_tutien": 0,
         "last_tuluyen": 0,
         "last_action": 0,
+        "last_haiduoc": 0,
         "durability": {
             "mu": 100,
             "giap": 100,
@@ -873,7 +921,7 @@ async def nhapdao(interaction: discord.Interaction):
         color=discord.Color.blue()
     )
     
-    await interaction.response.send_message(embed=embed)
+    await reply_msg(interaction, embed=embed)
 
 # --- 4.2 Lệnh Túi Đồ / Thông Tin (Xem trạng thái) ---
 
@@ -883,7 +931,7 @@ async def tuido(interaction: discord.Interaction):
     data = load_data()
     
     if uid not in data:
-        return await interaction.response.send_message("❌ Ngươi chưa nhập đạo!", ephemeral=True)
+        return await reply_msg(interaction, "❌ Ngươi chưa nhập đạo!", ephemeral=True)
     
     user = data[uid]
     idx = get_rank_index(user["tuvi"])
@@ -958,7 +1006,7 @@ async def tuido(interaction: discord.Interaction):
     
     embed.set_footer(text="Khi linh khí đầy, hãy đột phá để thăng tiến!")
 
-    await interaction.response.send_message(embed=embed)
+    await reply_msg(interaction, embed=embed)
 
 # --- 4.3 Lệnh Điểm Danh (Nhận Quà Mỗi Ngày) ---
 
@@ -1011,7 +1059,7 @@ async def diemdanh(interaction: discord.Interaction):
     embed.set_footer(text=f"Tài sản hiện có: {user['gold']} Vàng | {user['linhthach']} Linh Thạch")
     embed.set_thumbnail(url=interaction.user.display_avatar.url)
     
-    await interaction.response.send_message(embed=embed)
+    await reply_msg(interaction, embed=embed)
 
 #5: Hệ thống Trang Bị & GACHA
     
@@ -1022,7 +1070,7 @@ async def suado(interaction: discord.Interaction):
     data = load_data()
     
     if uid not in data:
-        return await interaction.response.send_message("❌ Ngươi chưa nhập đạo!", ephemeral=True)
+        return await reply_msg(interaction, "❌ Ngươi chưa nhập đạo!", ephemeral=True)
     
     user = data[uid]
     durability_data = user.get("durability", {"mu": 100, "giap": 100, "gang": 100, "giay": 100, "vukhi": 100})
@@ -1075,7 +1123,7 @@ async def gacha_pet(interaction: discord.Interaction, solan: int = 1):
     data = load_data()
     
     if uid not in data:
-        return await interaction.response.send_message("❌ Ngươi chưa nhập đạo!", ephemeral=True)
+        return await reply_msg(interaction, "❌ Ngươi chưa nhập đạo!", ephemeral=True)
     
     if not (1 <= solan <= 5):
         return await interaction.response.send_message("❌ Mỗi lần chỉ có thể triệu hồi từ 1 đến 5 linh thú!", ephemeral=True)
@@ -1161,7 +1209,7 @@ async def gacha_pet(interaction: discord.Interaction, solan: int = 1):
     
     embed.set_footer(text=f"💎 Linh Thạch còn lại: {user['linhthach']} viên")
 
-    await interaction.response.send_message(embed=embed)
+    await reply_msg(interaction, embed=embed)
 
 @bot.tree.command(name="gacha_trangbi", description="Triệu hồi trang bị (15 Linh Thạch/lần - Tối đa x5)")
 @app_commands.describe(solan="Số lần triệu hồi (từ 1 đến 5)")
@@ -1170,7 +1218,7 @@ async def gacha_trangbi(interaction: discord.Interaction, solan: int = 1):
     data = load_data()
     
     if uid not in data:
-        return await interaction.response.send_message("❌ Ngươi chưa nhập đạo!", ephemeral=True)
+        return await reply_msg(interaction, "❌ Ngươi chưa nhập đạo!", ephemeral=True)
     
     if not (1 <= solan <= 5):
         return await interaction.response.send_message("❌ Mỗi lần chỉ có thể triệu hồi từ 1 đến 5 trang bị!", ephemeral=True)
@@ -1239,7 +1287,7 @@ async def gacha_trangbi(interaction: discord.Interaction, solan: int = 1):
     
     embed.set_footer(text=f"💎 Linh Thạch còn lại: {user['linhthach']} | Độ bền đồ mới: 100%")
     
-    await interaction.response.send_message(embed=embed)
+    await reply_msg(interaction, embed=embed)
 
 
 # --- 5.3 Giao Dịch ---
@@ -1253,7 +1301,7 @@ async def chuyenvang(interaction: discord.Interaction, nguoi_nhan: discord.Membe
 
     # 1. Kiểm tra điều kiện cơ bản
     if uid_gui not in data:
-        return await interaction.response.send_message("❌ Ngươi chưa nhập đạo!", ephemeral=True)
+        return await reply_msg(interaction, "❌ Ngươi chưa nhập đạo!", ephemeral=True)
     if uid_nhan not in data:
         return await interaction.response.send_message("❌ Người nhận chưa gia nhập tông môn!", ephemeral=True)
     if uid_gui == uid_nhan:
@@ -1284,7 +1332,7 @@ async def chuyenvang(interaction: discord.Interaction, nguoi_nhan: discord.Membe
     embed.add_field(name="💰 Số lượng", value=f"`{so_luong}` Vàng", inline=True)
     embed.set_footer(text=f"Số dư còn lại: {user_gui['gold']} Vàng")
     
-    await interaction.response.send_message(embed=embed)
+    await reply_msg(interaction, embed=embed)
 
 
 @bot.tree.command(name="chuyenlinhthach", description="Chuyển Linh Thạch cho đạo hữu khác")
@@ -1296,7 +1344,7 @@ async def chuyenlinhthach(interaction: discord.Interaction, nguoi_nhan: discord.
 
     # 1. Kiểm tra điều kiện cơ bản
     if uid_gui not in data:
-        return await interaction.response.send_message("❌ Ngươi chưa nhập đạo!", ephemeral=True)
+        return await reply_msg(interaction, "❌ Ngươi chưa nhập đạo!", ephemeral=True)
     if uid_nhan not in data:
         return await interaction.response.send_message("❌ Người nhận chưa gia nhập tông môn!", ephemeral=True)
     if uid_gui == uid_nhan:
@@ -1327,7 +1375,7 @@ async def chuyenlinhthach(interaction: discord.Interaction, nguoi_nhan: discord.
     embed.add_field(name="✨ Số lượng", value=f"`{so_luong}` viên", inline=True)
     embed.set_footer(text=f"Số dư còn lại: {user_gui['linhthach']} Linh Thạch")
 
-    await interaction.response.send_message(embed=embed)
+    await reply_msg(interaction, embed=embed)
 
 
 #6: Boss & Bí Cảnh
@@ -1530,7 +1578,7 @@ async def huongdan(interaction: discord.Interaction):
     embed.set_footer(text="Chúc đạo hữu sớm đạt cảnh giới tối cao!")
     embed.set_thumbnail(url=interaction.user.display_avatar.url)
 
-    await interaction.response.send_message(embed=embed)
+    await reply_msg(interaction, embed=embed)
     
 
 # --- 7.2 BXH ---
@@ -1590,7 +1638,7 @@ async def bossinfo(interaction: discord.Interaction, boss_name: str):
 
     embed.set_footer(text="Lời khuyên: Hãy lập tổ đội ít nhất 2 người để có cơ hội chiến thắng!")
     
-    await interaction.response.send_message(embed=embed)
+    await reply_msg(interaction, embed=embed)
 
 
 @bot.tree.command(name="petinfo", description="Xem thông tin chi tiết về Linh Thú")
@@ -1617,7 +1665,7 @@ async def petinfo(interaction: discord.Interaction, pet_name: str):
         embed.add_field(name="✨ Tuyệt Kỹ", value=pet["skill"], inline=False)
 
     embed.set_footer(text="Linh thú càng mạnh, con đường tu tiên càng vững chãi!")
-    await interaction.response.send_message(embed=embed)
+    await reply_msg(interaction, embed=embed)
     
 
 @bot.tree.command(name="tbinfo", description="Xem toàn bộ bộ trang bị theo cấp bậc")
@@ -1665,7 +1713,7 @@ async def tbinfo(interaction: discord.Interaction, cap: int):
         return await interaction.response.send_message(f"❌ Không tìm thấy dữ liệu cho **{cap_str}**!", ephemeral=True)
 
     embed.set_footer(text=f"Tông chủ Momo • Thư viện thần khí")
-    await interaction.response.send_message(embed=embed)        
+    await reply_msg(interaction, embed=embed)        
 
 #8 Hệ thống BOT
 
@@ -1686,76 +1734,6 @@ async def auto_reset_linhkhi():
         print(f"[AUTO RESET] Da reset linh khi ngay: {today}")
 
 # --- 8.1 ---
-
-
-@bot.tree.command(name="thiendao_vang", description="Thiên đạo ban phát vàng cho một tu sĩ")
-@app_commands.describe(user="Người được ban phát", amount="Số lượng vàng", ly_do="Lý do ban phát")
-async def thiendao_vang(interaction: discord.Interaction, user: discord.Member, amount: int, ly_do: str = "Thiên đạo ban phúc"):
-    if not is_admin(interaction.user.id):
-        return await interaction.response.send_message("❌ Ngươi không có tư cách dùng quyền năng Thiên Đạo.", ephemeral=True)
-    if amount <= 0:
-        return await interaction.response.send_message("❌ Số lượng vàng phải lớn hơn 0.", ephemeral=True)
-
-    uid = str(user.id)
-    data = load_data()
-    if uid not in data:
-        return await interaction.response.send_message("❌ Tu sĩ này chưa nhập đạo.", ephemeral=True)
-
-    data[uid]["gold"] = data[uid].get("gold", 0) + amount
-    save_data(data)
-
-    embed = discord.Embed(
-        title="🌌 THIÊN ĐẠO GIÁNG PHÚC",
-        description=(
-            f"{user.mention} nhận được **{amount:,} vàng**\n"
-            f"📜 Lý do: *{ly_do}*"
-        ),
-        color=discord.Color.gold()
-    )
-    embed.add_field(name="💰 Túi đồ hiện tại", value=f"🪙 `{data[uid]['gold']:,}` Vàng", inline=False)
-    embed.set_thumbnail(url=user.display_avatar.url)
-    embed.set_footer(text=f"Ban phát bởi {interaction.user.display_name}")
-    await interaction.response.send_message(embed=embed)
-
-
-@bot.tree.command(name="thiendao_linhthach", description="Thiên đạo ban phát linh thạch cho một tu sĩ")
-@app_commands.describe(user="Người được ban phát", amount="Số linh thạch", ly_do="Lý do ban phát")
-async def thiendao_linhthach(interaction: discord.Interaction, user: discord.Member, amount: int, ly_do: str = "Thiên đạo ban phúc"):
-    if not is_admin(interaction.user.id):
-        return await interaction.response.send_message("❌ Ngươi không có tư cách dùng quyền năng Thiên Đạo.", ephemeral=True)
-    if amount <= 0:
-        return await interaction.response.send_message("❌ Số lượng linh thạch phải lớn hơn 0.", ephemeral=True)
-
-    uid = str(user.id)
-    data = load_data()
-    if uid not in data:
-        return await interaction.response.send_message("❌ Tu sĩ này chưa nhập đạo.", ephemeral=True)
-
-    data[uid]["linhthach"] = data[uid].get("linhthach", 0) + amount
-    save_data(data)
-
-    embed = discord.Embed(
-        title="💎 THIÊN ĐẠO GIÁNG PHÚC",
-        description=(
-            f"{user.mention} nhận được **{amount:,} linh thạch**\n"
-            f"📜 Lý do: *{ly_do}*"
-        ),
-        color=discord.Color.purple()
-    )
-    embed.add_field(name="🎒 Túi đồ hiện tại", value=f"💎 `{data[uid]['linhthach']:,}` Linh Thạch", inline=False)
-    embed.set_thumbnail(url=user.display_avatar.url)
-    embed.set_footer(text=f"Ban phát bởi {interaction.user.display_name}")
-    await interaction.response.send_message(embed=embed)
-
-
-@bot.tree.command(name="thiendao_check", description="Kiểm tra ngươi có phải Thiên Đạo không")
-async def thiendao_check(interaction: discord.Interaction):
-    if is_admin(interaction.user.id):
-        await interaction.response.send_message("✅ Ngươi là Thiên Đạo, có quyền ban phát phúc duyên.", ephemeral=True)
-    else:
-        await interaction.response.send_message("❌ Ngươi không phải Thiên Đạo.", ephemeral=True)
-
-
 @bot.event
 async def on_ready():
     print(f'He Thong Da Dang Nhap: {bot.user}')
