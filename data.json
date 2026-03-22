@@ -55,5 +55,22 @@
             "vukhi": 82
         },
         "exp_ngay": 108
+    },
+    "637864631045586964": {
+        "name": "Xí Quách",
+        "tuvi": 0,
+        "gold": 1875,
+        "linhthach": 35,
+        "trangbi": {
+            "mu": "Cấp 1",
+            "giap": "Cấp 1",
+            "gang": "Cấp 1",
+            "giay": "Cấp 1",
+            "vukhi": "Cấp 1"
+        },
+        "tui_do": {},
+        "pet": null,
+        "last_tuluyen": 0,
+        "last_diemdanh": "2026-03-15"
     }
 }
