@@ -40,6 +40,36 @@ def load_data():
 def save_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+def ensure_user_schema(user: dict):
+    user.setdefault("name", "Tu Sĩ Vô Danh")
+    user.setdefault("tuvi", 0)
+    user.setdefault("gold", 0)
+    user.setdefault("linhthach", 0)
+    user.setdefault("exp_ngay", 0)
+    user.setdefault("last_reset_day", get_today_str() if 'get_today_str' in globals() else "")
+    user.setdefault("pet", None)
+    user.setdefault("tui_do", {})
+    user.setdefault("last_tutien", 0)
+    user.setdefault("last_tuluyen", 0)
+    user.setdefault("last_haiduoc", 0)
+    user.setdefault("last_action", 0)
+    user.setdefault("injury_until", 0)
+    user.setdefault("trangbi", {
+        "mu": "Cấp 1",
+        "giap": "Cấp 1",
+        "gang": "Cấp 1",
+        "giay": "Cấp 1",
+        "vukhi": "Cấp 1"
+    })
+    user.setdefault("durability", {
+        "mu": 100,
+        "giap": 100,
+        "gang": 100,
+        "giay": 100,
+        "vukhi": 100
+    })
+    user.setdefault("last_diemdanh", "")
+    return user
 # 1. Hàm hỗ trợ gợi ý danh sách Pet (Autocomplete)
 async def pet_autocomplete(
     interaction: discord.Interaction,
@@ -58,13 +88,26 @@ intents.message_content = True
 intents.members = True 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-def is_admin(user_id: int) -> bool:
-    return user_id in ADMIN_IDS
+def _parse_id_set(raw: str) -> set[int]:
+    result = set()
+    for x in (raw or "").split(","):
+        x = x.strip()
+        if x.isdigit():
+            result.add(int(x))
+    return result
 
-ADMIN_IDS = {467401731303669760}
-admin_ids_raw = os.getenv("ADMIN_IDS", "")
-if admin_ids_raw:
-    ADMIN_IDS.update({int(x.strip()) for x in admin_ids_raw.split(",") if x.strip()})
+# --- THIÊN ĐẠO / ADMIN ---
+# Ưu tiên set biến môi trường THIEN_DAO_ID hoặc OWNER_ID để chỉ định riêng 1 người.
+# Có thể thêm nhiều admin phụ bằng ADMIN_IDS="id1,id2"
+OWNER_ID_RAW = os.getenv("THIEN_DAO_ID") or os.getenv("OWNER_ID") or "467401731303669760"
+OWNER_ID = int(OWNER_ID_RAW) if str(OWNER_ID_RAW).strip().isdigit() else 467401731303669760
+
+ADMIN_IDS = {OWNER_ID}
+ADMIN_IDS.update(_parse_id_set(os.getenv("ADMIN_IDS", "")))
+
+
+def is_admin(user_id: int) -> bool:
+    return int(user_id) in ADMIN_IDS
 
 async def reply_msg(interaction: discord.Interaction, content=None, embed=None, ephemeral=False):
     try:
@@ -265,6 +308,7 @@ async def set_tuvi(interaction: discord.Interaction, user: discord.Member, amoun
     if uid not in data:
         return await interaction.response.send_message("❌ Tu sĩ này chưa nhập đạo.", ephemeral=True)
     
+    ensure_user_schema(data[uid])
     old_tuvi = data[uid]["tuvi"]
     data[uid]["tuvi"] = max(0, amount)
     save_data(data)
@@ -280,6 +324,7 @@ async def reset_tuvi(interaction: discord.Interaction, user: discord.Member):
     data = load_data()
     
     if uid in data:
+        ensure_user_schema(data[uid])
         data[uid]["tuvi"] = 0
         save_data(data)
         await interaction.response.send_message(f"♻️ **Thiên Đạo** đã tẩy tủy cho **{user.display_name}**. Tu vi đã về 0, nhưng trang bị và vật phẩm vẫn giữ nguyên.")
@@ -312,6 +357,7 @@ async def add_linhthach(interaction: discord.Interaction, user: discord.Member, 
     if uid not in data:
         return await interaction.response.send_message("❌ Tu sĩ này chưa nhập đạo.", ephemeral=True)
     
+    ensure_user_schema(data[uid])
     data[uid]["linhthach"] += amount
     save_data(data)
     
@@ -335,6 +381,7 @@ async def add_vang(interaction: discord.Interaction, user: discord.Member, amoun
         return await interaction.response.send_message("❌ Tu sĩ này chưa nhập đạo.", ephemeral=True)
 
     # 2. Thực hiện cộng vàng
+    ensure_user_schema(data[uid])
     old_gold = data[uid].get("gold", 0)
     data[uid]["gold"] = old_gold + amount
     
@@ -363,6 +410,8 @@ async def add_pet(interaction: discord.Interaction, user: discord.Member, pet_na
     
     if uid not in data:
         return await interaction.response.send_message("❌ Tu sĩ này chưa nhập đạo.", ephemeral=True)
+
+    ensure_user_schema(data[uid])
 
     # Xử lý thu hồi linh thú
     if pet_name.lower() == "none":
@@ -403,6 +452,8 @@ async def add_trangbi(interaction: discord.Interaction, user: discord.Member, lo
     
     if uid not in data:
         return await interaction.response.send_message("❌ Tu sĩ này chưa nhập đạo.", ephemeral=True)
+
+    ensure_user_schema(data[uid])
 
     # 1. Tìm "Cấp độ" (Key) của món đồ dựa trên tên Admin chọn
     found_level = None
@@ -465,32 +516,35 @@ def check_daily_reset(user):
 
 def get_remaining_cooldown(user, action_name: str, now: int) -> int:
     """
-    Tương thích data cũ:
-    - tutien / tuluyen trước đây dùng last_action
-    - haiduoc dùng last_haiduoc
-    Data mới sẽ ưu tiên từng key riêng.
+    Data mới dùng cooldown riêng cho từng lệnh.
+    Data cũ chỉ fallback sang last_action nếu key riêng chưa tồn tại hoặc đang = 0.
+    Như vậy sẽ không còn lỗi tutien/tuluyen kéo cooldown của nhau ngoài ý muốn.
     """
-    action_key_map = {
-        "tutien": ["last_tutien", "last_action"],
-        "tuluyen": ["last_tuluyen", "last_action"],
-        "haiduoc": ["last_haiduoc"],
+    dedicated_key_map = {
+        "tutien": "last_tutien",
+        "tuluyen": "last_tuluyen",
+        "haiduoc": "last_haiduoc",
     }
-    keys = action_key_map.get(action_name, [])
-    latest_until = 0
-    for key in keys:
-        latest_until = max(latest_until, int(user.get(key, 0) or 0))
-    return max(0, latest_until - now)
+    dedicated_key = dedicated_key_map.get(action_name)
+    dedicated_until = int(user.get(dedicated_key, 0) or 0) if dedicated_key else 0
+
+    if dedicated_until > now:
+        return dedicated_until - now
+
+    # fallback cho data cũ trước khi có key riêng
+    legacy_until = int(user.get("last_action", 0) or 0)
+    if dedicated_until <= 0 and action_name in ("tutien", "tuluyen") and legacy_until > now:
+        return legacy_until - now
+
+    return 0
 
 
 def set_action_cooldown(user, action_name: str, cooldown_seconds: int, now: int):
     until = now + cooldown_seconds
     if action_name == "tutien":
         user["last_tutien"] = until
-        # giữ last_action để tương thích code cũ / data cũ
-        user["last_action"] = until
     elif action_name == "tuluyen":
         user["last_tuluyen"] = until
-        user["last_action"] = until
     elif action_name == "haiduoc":
         user["last_haiduoc"] = until
 
@@ -521,6 +575,7 @@ async def tutien(interaction: discord.Interaction):
         return await reply_msg(interaction, "❌ Ngươi chưa nhập đạo!", ephemeral=True)
 
     user = data[uid]
+    ensure_user_schema(user)
     now = int(time.time())
 
     # Reset linh khí ngày nếu đã sang ngày mới
@@ -613,7 +668,7 @@ async def tutien(interaction: discord.Interaction):
 
     await reply_msg(interaction, embed=embed)
 
-@bot.tree.command(name="tuluyen", description="Ra ngoài diệt quái (Delay 5 phút - Chung với Tutien)")
+@bot.tree.command(name="tuluyen", description="Ra ngoài diệt quái (Delay 3 phút)")
 async def tuluyen(interaction: discord.Interaction):
     uid = str(interaction.user.id)
     data = load_data()
@@ -622,6 +677,7 @@ async def tuluyen(interaction: discord.Interaction):
         return await reply_msg(interaction, "❌ Ngươi chưa nhập đạo!", ephemeral=True)
 
     user = data[uid]
+    ensure_user_schema(user)
     now = int(time.time())
 
     # Reset linh khí ngày nếu đã sang ngày mới
@@ -732,12 +788,12 @@ async def tuluyen(interaction: discord.Interaction):
             user["durability"][slot] = max(0, user["durability"][slot] - loss)
             embed.description += f"\n• {slot_icons[slot]} {slot.upper()}: `-{loss}%` (Còn {user['durability'][slot]}%)"
 
-    set_action_cooldown(user, "tuluyen", 300, now)
+    set_action_cooldown(user, "tuluyen", 180, now)
     save_data(data)
 
     await reply_msg(interaction, embed=embed)
 
-@bot.tree.command(name="haiduoc", description="Cùng Linh thú vào rừng hái dược (1 tiếng/lần - Nhận 5-20 Linh Thạch)")
+@bot.tree.command(name="haiduoc", description="Cùng Linh thú vào rừng hái dược (3 phút/lần - Nhận 5-20 Linh Thạch)")
 async def haiduoc(interaction: discord.Interaction):
     uid = str(interaction.user.id)
     data = load_data()
@@ -746,9 +802,10 @@ async def haiduoc(interaction: discord.Interaction):
         return await reply_msg(interaction, "❌ Ngươi chưa nhập đạo!", ephemeral=True)
     
     user = data[uid]
+    ensure_user_schema(user)
     now = int(time.time())
 
-    # --- 1. KIỂM TRA COOLDOWN (1 TIẾNG) ---
+    # --- 1. KIỂM TRA COOLDOWN (3 PHÚT) ---
     rem = get_remaining_cooldown(user, "haiduoc", now)
     if rem > 0 and not is_admin(interaction.user.id):
         phut = rem // 60
@@ -777,7 +834,7 @@ async def haiduoc(interaction: discord.Interaction):
         user["linhthach"] = 0
         
     user["linhthach"] += final_lt
-    user["last_haiduoc"] = now + 3600 
+    set_action_cooldown(user, "haiduoc", 180, now)
     save_data(data)
 
     # --- 4. PHẢN HỒI ---
@@ -789,7 +846,7 @@ async def haiduoc(interaction: discord.Interaction):
     embed.add_field(name="💎 Linh Thạch nhận được", value=f"`+{final_lt}` viên {bonus_msg}", inline=False)
     embed.add_field(name="🎒 Tổng kho", value=f"`{user['linhthach']}` Linh Thạch", inline=True)
     
-    embed.set_footer(text="⏳ Cần nghỉ ngơi 1 tiếng để hồi phục thể lực")
+    embed.set_footer(text="⏳ Cần nghỉ ngơi 3 phút để hồi phục thể lực")
     embed.set_thumbnail(url=interaction.user.display_avatar.url)
     
     await reply_msg(interaction, embed=embed)
@@ -803,6 +860,7 @@ async def dotpha(interaction: discord.Interaction):
     if uid not in data: return
     
     user = data[uid]
+    ensure_user_schema(user)
 
     # Khi mở túi đồ, nếu đã sang ngày mới thì reset linh khí ngày
     if check_daily_reset(user):
@@ -934,6 +992,7 @@ async def tuido(interaction: discord.Interaction):
         return await reply_msg(interaction, "❌ Ngươi chưa nhập đạo!", ephemeral=True)
     
     user = data[uid]
+    ensure_user_schema(user)
     idx = get_rank_index(user["tuvi"])
     rank = RANKS[idx]
     
@@ -1019,6 +1078,7 @@ async def diemdanh(interaction: discord.Interaction):
         return await interaction.response.send_message("❌ Ngươi chưa nhập đạo! Hãy dùng `/nhapdao` trước.", ephemeral=True)
     
     user = data[uid]
+    ensure_user_schema(user)
 
     # Sang ngày mới thì reset linh khí ngày luôn
     check_daily_reset(user)
@@ -1073,6 +1133,7 @@ async def suado(interaction: discord.Interaction):
         return await reply_msg(interaction, "❌ Ngươi chưa nhập đạo!", ephemeral=True)
     
     user = data[uid]
+    ensure_user_schema(user)
     durability_data = user.get("durability", {"mu": 100, "giap": 100, "gang": 100, "giay": 100, "vukhi": 100})
     slot_icons = {"mu": "👑", "giap": "🛡️", "gang": "🥊", "giay": "👞", "vukhi": "⚔️"}
     
@@ -1129,6 +1190,7 @@ async def gacha_pet(interaction: discord.Interaction, solan: int = 1):
         return await interaction.response.send_message("❌ Mỗi lần chỉ có thể triệu hồi từ 1 đến 5 linh thú!", ephemeral=True)
     
     user = data[uid]
+    ensure_user_schema(user)
     cost_per_roll = 10
     total_cost = cost_per_roll * solan
     
@@ -1224,6 +1286,7 @@ async def gacha_trangbi(interaction: discord.Interaction, solan: int = 1):
         return await interaction.response.send_message("❌ Mỗi lần chỉ có thể triệu hồi từ 1 đến 5 trang bị!", ephemeral=True)
     
     user = data[uid]
+    ensure_user_schema(user)
     cost_per_roll = 15
     total_cost = cost_per_roll * solan
     
