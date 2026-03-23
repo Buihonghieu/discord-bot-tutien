@@ -29,8 +29,8 @@ intents.message_content = True
 intents.members = True 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-ADMIN_IDS = [1480398699174695044] 
-THIEN_DAO_ID = 1480398699174695044  # Đổi thành Discord ID duy nhất của Thiên Đạo
+ADMIN_IDS = [467401731303669760] 
+THIEN_DAO_ID = 467401731303669760  # Đổi thành Discord ID duy nhất của Thiên Đạo
 VN_TZ = timezone(timedelta(hours=7))
 MAX_LINH_KHI_NGAY = 3000
 
